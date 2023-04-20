@@ -1,7 +1,7 @@
 VERSION 0.6
 FROM alpine
 
-ARG BASE_IMAGE=public.ecr.aws/s0y1t3q2/baronos/core-ubuntu-22-lts-lite:latest
+ARG BASE_IMAGE=public.ecr.aws/s0y1t3q2/baronos/baronos-ubuntu-22-lts-lite:v0.0.1-1-g2b94a64-k3sv1.26.3-k3s1
 ARG IMAGE_REPOSITORY=public.ecr.aws/s0y1t3q2/baronos
 
 ARG LUET_VERSION=0.33.0
