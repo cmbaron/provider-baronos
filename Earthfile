@@ -84,7 +84,7 @@ base-image:
 
     RUN --no-cache kernel=$(ls /lib/modules | head -n1) && dracut -f "/boot/initrd-${kernel}" "${kernel}" && ln -sf "initrd-${kernel}" /boot/initrd
     RUN --no-cache kernel=$(ls /lib/modules | head -n1) && depmod -a "${kernel}"
-
+    
     RUN kernel=$(ls /boot/vmlinuz-* | head -n1) && if [ -e "$kernel" ]; then ln -sf "${kernel#/boot/}" /boot/vmlinuz; fi
     RUN kernel=$(ls /boot/Image-* | head -n1) && if [ -e "$kernel" ]; then ln -sf "${kernel#/boot/}" /boot/vmlinuz; fi
 
@@ -109,9 +109,10 @@ image:
     RUN snap download core  --target-directory /opt/microk8s/snaps --basename core
 
     COPY +build-provider/agent-provider-microk8s /system/providers/agent-provider-microk8s
+    COPY overlay/files-microk8s /opt/microk8s/scripts
     RUN chmod +x /opt/microk8s/scripts/*
 
-    COPY overlay /tmp/overlay
+    COPY overlay/files-baronos /tmp/overlay
     RUN find /tmp/overlay -type f | xargs perl -pi -e "s/{{ BUILD_OS_VERSION }}/${VERSION}/" && rsync -rt /tmp/overlay/ / && rm -rf /tmp/overlay
 
     RUN luet install -y utils/edgevpn utils/k9s utils/nerdctl container/kubectl utils/kube-vip && luet cleanup
@@ -131,7 +132,7 @@ iso:
     ARG OSBUILDER_IMAGE
     ARG ISO_NAME=${OS_ID}
     ARG IMG=docker:$IMAGE
-    ARG overlay=files-iso
+    ARG overlay=overlay/files-iso
     FROM $OSBUILDER_IMAGE
     WORKDIR /build
     COPY . ./
@@ -149,7 +150,7 @@ iso-remote:
     ARG OSBUILDER_IMAGE
     ARG ISO_NAME=${OS_ID}
     ARG IMG=docker:$IMAGE
-    ARG overlay=files-iso
+    ARG overlay=overlay/files-iso
     FROM $OSBUILDER_IMAGE
     WORKDIR /build
     COPY . ./
