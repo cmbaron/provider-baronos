@@ -8,11 +8,15 @@ ARG LUET_VERSION=0.33.0
 ARG GOLINT_VERSION=1.52.2
 ARG GOLANG_VERSION=1.20
 
+ARG OSBUILDER_VERSION=v0.6.1
+ARG OSBUILDER_IMAGE=quay.io/kairos/osbuilder-tools:$OSBUILDER_VERSION
+
 ARG OS_ID=baronos
 ARG OS_NAME=BARONos
 ARG IMAGE_NAME=${OS_ID}/core
 
-ARG MICROK8S_CHANNEL=latest
+ARG MICROK8S_CHANNEL=1.27
+ARG IMAGE=$IMAGE_REPOSITORY/${IMAGE_NAME}:v${MICROK8S_CHANNEL}
 
 build-cosign:
     FROM gcr.io/projectsigstore/cosign:v1.13.1
@@ -65,67 +69,28 @@ base-image:
 
     IF [ "$BASE_IMAGE" = "" ]
         FROM DOCKERFILE -f base/Dockerfile base
-        SAVE IMAGE --push $IMAGE_REPOSITORY/${IMAGE_NAME}-base:${VERSION}
     ELSE 
         FROM $BASE_IMAGE
     END
 
     RUN rm -rf /etc/machine-id && touch /etc/machine-id && chmod 444 /etc/machine-id
 
-    # Enable services
-    IF [ -f /sbin/openrc ]
-     RUN mkdir -p /etc/runlevels/default && \
-      ln -sf /etc/init.d/cos-setup-boot /etc/runlevels/default/cos-setup-boot  && \
-      ln -sf /etc/init.d/cos-setup-network /etc/runlevels/default/cos-setup-network  && \
-      ln -sf /etc/init.d/cos-setup-reconcile /etc/runlevels/default/cos-setup-reconcile && \
-      ln -sf /etc/init.d/kairos-agent /etc/runlevels/default/kairos-agent
-    # Otherwise we assume systemd
-    ELSE
-      RUN ls -liah /etc/systemd/system
-      RUN systemctl enable cos-setup-reconcile.timer && \
-          systemctl enable cos-setup-fs.service && \
-          systemctl enable cos-setup-boot.service && \
-          systemctl enable cos-setup-network.service
-    END
+    RUN ls -liah /etc/systemd/system
+    RUN systemctl enable cos-setup-reconcile.timer && \
+        systemctl enable cos-setup-fs.service && \
+        systemctl enable cos-setup-boot.service && \
+        systemctl enable cos-setup-network.service
 
-    IF [ "$FLAVOR" = "debian" ]
-	    RUN rm -rf /boot/initrd.img-*
-    END
 
-    IF [[ "$FLAVOR" =~ ^alpine.* ]] 
-        # no dracut on those flavors, do nothing
-    ELSE
-        # Regenerate initrd if necessary
-        RUN --no-cache kernel=$(ls /lib/modules | head -n1) && dracut -f "/boot/initrd-${kernel}" "${kernel}" && ln -sf "initrd-${kernel}" /boot/initrd
-        RUN --no-cache kernel=$(ls /lib/modules | head -n1) && depmod -a "${kernel}"
-    END
+    RUN --no-cache kernel=$(ls /lib/modules | head -n1) && dracut -f "/boot/initrd-${kernel}" "${kernel}" && ln -sf "initrd-${kernel}" /boot/initrd
+    RUN --no-cache kernel=$(ls /lib/modules | head -n1) && depmod -a "${kernel}"
 
-    IF [ "$FLAVOR" = "fedora" ] || [ "$FLAVOR" = "rockylinux" ]
-        # https://github.com/kairos-io/elemental-cli/blob/23ca64435fedb9f521c95e798d2c98d2714c53bd/pkg/elemental/elemental.go#L553
-        RUN rm -rf /boot/initramfs-*
-    END
-
-    # Set /boot/vmlinuz pointing to our kernel so elemental-cli can use it
-    # https://github.com/kairos-io/elemental-cli/blob/23ca64435fedb9f521c95e798d2c98d2714c53bd/pkg/elemental/elemental.go#L553
-    IF [ ! -e "/boot/vmlinuz" ]
-        # If it's an ARM flavor, we want a symlink here from zImage/Image
-        # Check that its not a symlink already or grub will fail!
-        IF [ -e "/boot/Image" ] && [ ! -L "/boot/Image" ]
-            RUN ln -sf Image /boot/vmlinuz
-        ELSE IF [ -e "/boot/zImage" ]
-            IF  [ ! -L "/boot/zImage" ]
-                RUN ln -sf zImage /boot/vmlinuz
-            ELSE
-                RUN kernel=$(ls /boot/zImage-* | head -n1) && if [ -e "$kernel" ]; then ln -sf "${kernel#/boot/}" /boot/vmlinuz; fi
-            END
-        ELSE
-            # Debian has vmlinuz-VERSION
-            RUN kernel=$(ls /boot/vmlinuz-* | head -n1) && if [ -e "$kernel" ]; then ln -sf "${kernel#/boot/}" /boot/vmlinuz; fi
-            RUN kernel=$(ls /boot/Image-* | head -n1) && if [ -e "$kernel" ]; then ln -sf "${kernel#/boot/}" /boot/vmlinuz; fi
-        END
-    END
+    RUN kernel=$(ls /boot/vmlinuz-* | head -n1) && if [ -e "$kernel" ]; then ln -sf "${kernel#/boot/}" /boot/vmlinuz; fi
+    RUN kernel=$(ls /boot/Image-* | head -n1) && if [ -e "$kernel" ]; then ln -sf "${kernel#/boot/}" /boot/vmlinuz; fi
 
     RUN rm -rf /tmp/*
+
+    SAVE IMAGE --push $IMAGE-base:${VERSION}
 
 image:
     DO +VERSION
@@ -140,16 +105,14 @@ image:
             iptables-persistent \
         && apt-get clean && rm -rf /var/lib/apt/lists/* && rm -rf /var/cache/*
 
-    RUN snap download microk8s --channel=$MICROK8S_CHANNEL --target-directory /opt/microk8s/snaps --basename microk8s
+    RUN snap download microk8s --channel=${MICROK8S_CHANNEL}/stable --target-directory /opt/microk8s/snaps --basename microk8s
     RUN snap download core  --target-directory /opt/microk8s/snaps --basename core
 
     COPY +build-provider/agent-provider-microk8s /system/providers/agent-provider-microk8s
-    COPY scripts/cloudinit /opt/microk8s/scripts
     RUN chmod +x /opt/microk8s/scripts/*
 
     COPY overlay /tmp/overlay
     RUN find /tmp/overlay -type f | xargs perl -pi -e "s/{{ BUILD_OS_VERSION }}/${VERSION}/" && rsync -rt /tmp/overlay/ / && rm -rf /tmp/overlay
-
 
     RUN luet install -y utils/edgevpn utils/k9s utils/nerdctl container/kubectl utils/kube-vip && luet cleanup
 
@@ -157,8 +120,42 @@ image:
 
     RUN rm -rf /var/cache/* || journalctl --vacuum-size=1K || rm /etc/machine-id || rm /var/lib/dbus/machine-id || rm /etc/hostname || touch /etc/machine-id && ln -s /etc/machine-id /var/lib/dbus/machine-id || chmod 444 /etc/machine-id
 
-    SAVE IMAGE --push $IMAGE_REPOSITORY/${IMAGE_NAME}:v${MICROK8S_CHANNEL}
-    SAVE IMAGE --push $IMAGE_REPOSITORY/${IMAGE_NAME}:${VERSION}_v${MICROK8S_CHANNEL}
+    SAVE IMAGE --push $IMAGE:v${MICROK8S_CHANNEL}
+    SAVE IMAGE --push $IMAGE:${VERSION}_v${MICROK8S_CHANNEL}
+
+image-rootfs:
+    FROM +image
+    SAVE ARTIFACT --keep-own /. rootfs
+
+iso:
+    ARG OSBUILDER_IMAGE
+    ARG ISO_NAME=${OS_ID}
+    ARG IMG=docker:$IMAGE
+    ARG overlay=files-iso
+    FROM $OSBUILDER_IMAGE
+    WORKDIR /build
+    COPY . ./
+    COPY --keep-own +image-rootfs/rootfs /build/image
+    RUN /entrypoint.sh --name $ISO_NAME --debug build-iso --squash-no-compression --date=false dir:/build/image --overlay-iso /build/${overlay} --output /build/
+    SAVE ARTIFACT /build/$ISO_NAME.iso kairos.iso AS LOCAL build/$ISO_NAME.iso
+    SAVE ARTIFACT /build/$ISO_NAME.iso.sha256 kairos.iso.sha256 AS LOCAL build/$ISO_NAME.iso.sha256
+
+# This target builds an iso using a remote docker image as rootfs instead of building the whole rootfs
+# This should be really fast as it uses an existing image. This requires a pushed image from the +image target
+# defaults to use the $IMAGE name (so ttl.sh/core-opensuse-leap:latest)
+# you can override either the full thing by setting --IMG=docker:REPO/IMAGE:TAG
+# or by --IMAGE=REPO/IMAGE:TAG
+iso-remote:
+    ARG OSBUILDER_IMAGE
+    ARG ISO_NAME=${OS_ID}
+    ARG IMG=docker:$IMAGE
+    ARG overlay=files-iso
+    FROM $OSBUILDER_IMAGE
+    WORKDIR /build
+    COPY . ./
+    RUN /entrypoint.sh --name $ISO_NAME --debug build-iso --squash-no-compression --date=false $IMG --overlay-iso /build/${overlay} --output /build/
+    SAVE ARTIFACT /build/$ISO_NAME.iso kairos.iso AS LOCAL build/$ISO_NAME.iso
+    SAVE ARTIFACT /build/$ISO_NAME.iso.sha256 kairos.iso.sha256 AS LOCAL build/$ISO_NAME.iso.sha256
 
 cosign:
     ARG --required ACTIONS_ID_TOKEN_REQUEST_TOKEN
