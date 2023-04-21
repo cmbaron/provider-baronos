@@ -1,8 +1,12 @@
-# Kairos Microk8s Cluster Plugin
+# BARONos 
 
----
+An immutible, bootable, a/b upgradable k8s-serving distribution.
 
-This provider will configure a Microk8s installation based on the cluster section of cloud init.
+This isn't so much an OS, as much as it's a rebranding of Ubuntu, and a packaging of Kairos.
+
+This repo implements that as a Kairos "custom build" option, merging an Ubuntu 22-lts image with Kairos framework, and a fork of github.com/kairos-io/provider-microk8s.
+
+
 
 ## Configuration
 
