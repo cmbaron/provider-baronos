@@ -81,7 +81,7 @@ func clusterProvider(cluster clusterplugin.Cluster) yip.YipConfig {
 		Name: "MicroK8S Kairos Cluster Provider",
 		Stages: map[string][]yip.Stage{
 			"boot.before": stages,
-			"fs": fsStages,
+			"boot": fsStages,
 		},
 	}
 	cfgStr, _ := kyaml.Marshal(cfg)
