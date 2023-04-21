@@ -16,7 +16,7 @@ ARG OS_NAME=BARONos
 ARG IMAGE_NAME=${OS_ID}/core
 
 ARG MICROK8S_CHANNEL=1.27
-ARG IMAGE=$IMAGE_REPOSITORY/${IMAGE_NAME}:v${MICROK8S_CHANNEL}
+ARG IMAGE=$IMAGE_REPOSITORY/${IMAGE_NAME}
 
 build-cosign:
     FROM gcr.io/projectsigstore/cosign:v1.13.1
@@ -131,7 +131,7 @@ image-rootfs:
 iso:
     ARG OSBUILDER_IMAGE
     ARG ISO_NAME=${OS_ID}
-    ARG IMG=docker:$IMAGE
+    ARG IMG=docker:$IMAGE:v${MICROK8S_CHANNEL}
     ARG overlay=overlay/files-iso
     FROM $OSBUILDER_IMAGE
     WORKDIR /build
@@ -149,7 +149,7 @@ iso:
 iso-remote:
     ARG OSBUILDER_IMAGE
     ARG ISO_NAME=${OS_ID}
-    ARG IMG=docker:$IMAGE
+    ARG IMG=docker:$IMAGE:v${MICROK8S_CHANNEL}
     ARG overlay=overlay/files-iso
     FROM $OSBUILDER_IMAGE
     WORKDIR /build
