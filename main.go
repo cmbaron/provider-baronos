@@ -61,6 +61,7 @@ func main() {
 }
 func clusterProvider(cluster clusterplugin.Cluster) yip.YipConfig {
 	var stages []yip.Stage
+	var fsStages []yip.Stage
 	var microk8sConfig MicroK8sSpec
 	token := createMicroK8SToken(cluster.ClusterToken)
 	if cluster.Options != "" {
@@ -70,6 +71,7 @@ func clusterProvider(cluster clusterplugin.Cluster) yip.YipConfig {
 	switch cluster.Role {
 	case clusterplugin.RoleInit:
 		stages = generateInitStages(cluster, token, microk8sConfig)
+		fsStages = generateInitFsStages(cluster, token, microk8sConfig)
 	case clusterplugin.RoleControlPlane:
 		stages = generateControlPlaneJoinStages(cluster, token, microk8sConfig)
 	case clusterplugin.RoleWorker:
@@ -78,13 +80,30 @@ func clusterProvider(cluster clusterplugin.Cluster) yip.YipConfig {
 	cfg := yip.YipConfig{
 		Name: "MicroK8S Kairos Cluster Provider",
 		Stages: map[string][]yip.Stage{
-			"boot": stages,
+			"boot.before": stages,
+			"fs": fsStages,
 		},
 	}
 	cfgStr, _ := kyaml.Marshal(cfg)
 	logrus.Printf("out %s", string(cfgStr))
 	return cfg
 }
+
+func generateInitFsStages(cluster clusterplugin.Cluster, token string, userConfig MicroK8sSpec) []yip.Stage {
+	var installCommands []string
+
+	addons := parseAddons(userConfig)
+	installCommands = append(installCommands, fmt.Sprintf("%s %s", scriptPath(microk8sEnableScript), strings.Join(addons, " ")))
+	
+	return []yip.Stage{
+		{
+			Name:     "Install MicroK8S on control Plane init",
+			Commands: installCommands,
+			If:       ifmicrok8sNotInstalled,
+		},
+	}
+}
+
 
 func generateInitStages(cluster clusterplugin.Cluster, token string, userConfig MicroK8sSpec) []yip.Stage {
 	var installCommands []string
@@ -112,8 +131,6 @@ func generateInitStages(cluster clusterplugin.Cluster, token string, userConfig 
 	installCommands = append(installCommands, fmt.Sprintf("%s %v %q", scriptPath(configureDNSScript), userConfig.ClusterConfiguration.UseHostDNS, userConfig.ClusterConfiguration.DNS))
 	installCommands = append(installCommands, fmt.Sprintf("%s %q %q", scriptPath(configureAltNamesScript), endpointType, cluster.ControlPlaneHost))
 
-	addons := parseAddons(userConfig)
-	installCommands = append(installCommands, fmt.Sprintf("%s %s", scriptPath(microk8sEnableScript), strings.Join(addons, " ")))
 	installCommands = append(installCommands, scriptPath(configureCPKubeletScript))
 
 	writeKubeConfigCommand := fmt.Sprintf("%s %s", scriptPath(microk8sKubeConfigScript), userConfig.ClusterConfiguration.WriteKubeconfig)
