@@ -1,0 +1,8 @@
+name: "SELinux"
+stages:
+   initramfs:
+     - name: "Relabelling"
+       commands:
+       - |
+           load_policy -i
+           restorecon -R -i -v /etc /root /opt /srv /var /home /usr/local /oem
