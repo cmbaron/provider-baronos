@@ -39,6 +39,7 @@ const (
 	tokenTTL               = 315569260
 	ifmicroK8sInstalled    = "[ -d \"/var/snap/microk8s\" ]"
 	ifmicrok8sNotInstalled = "[ ! -d \"/var/snap/microk8s\" ]"
+	ifmicrok8sInstalling   = "[ -e \"/usr/local/.microk8s/installing\" ]"
 )
 
 func main() {
@@ -94,12 +95,13 @@ func generateInitFsStages(cluster clusterplugin.Cluster, token string, userConfi
 
 	addons := parseAddons(userConfig)
 	installCommands = append(installCommands, fmt.Sprintf("%s %s", scriptPath(microk8sEnableScript), strings.Join(addons, " ")))
-	
+	installCommands = append(installCommands, fmt.Sprintf("rm /usr/local/.microk8s/installing"))
+
 	return []yip.Stage{
 		{
 			Name:     "Install MicroK8S on control Plane init",
 			Commands: installCommands,
-			If:       ifmicrok8sNotInstalled,
+			If:       ifmicrok8sInstalling,
 		},
 	}
 }
@@ -256,6 +258,7 @@ func getBaseInstallCommands(cluster clusterplugin.Cluster, token string, install
 	// Add installed sentinel files
 	installCommands = append(installCommands, "mkdir -p /usr/local/.microk8s")
 	installCommands = append(installCommands, "snap list |grep microk8s |cut -f 3 -d ' ' > /usr/local/.microk8s/installed")
+	installCommands = append(installCommands, "touch /usr/local/.microk8s/installing")
 
 	return installCommands
 }
