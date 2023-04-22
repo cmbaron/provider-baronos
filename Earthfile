@@ -121,6 +121,7 @@ image:
 
     RUN rm -rf /var/cache/* && journalctl --vacuum-size=1K && rm /etc/machine-id && rm -rf /var/lib/dbus/machine-id && rm /etc/hostname && touch /etc/machine-id && ln -s /etc/machine-id /var/lib/dbus/machine-id && chmod 444 /etc/machine-id
 
+    SAVE IMAGE --push $IMAGE:latest
     SAVE IMAGE --push $IMAGE:v${MICROK8S_CHANNEL}
     SAVE IMAGE --push $IMAGE:${VERSION}_v${MICROK8S_CHANNEL}
 
