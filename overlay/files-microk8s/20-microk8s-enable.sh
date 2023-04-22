@@ -9,6 +9,8 @@
 
 # enable community addons, this is for free and avoids confusion if addons are failing to install
 microk8s enable community || true
+pwd
+mount
 
 while [[ "$@" != "" ]]; do
   microk8s enable "$1"
