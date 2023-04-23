@@ -82,6 +82,8 @@ RUN  sed -i -e 's/http:\/\/archive\.ubuntu\.com\/ubuntu\//http:\/\/mirror\.math\
     less \
     linux-image-generic \
     nvidia-utils-525-server \
+    gpg \
+    scdaemon \
     linux-modules-nvidia-525-server-generic \
  && for DIR in firmware; do \
         mkdir /usr/lib/$DIR.keep; \
