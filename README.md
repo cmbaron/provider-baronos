@@ -6,7 +6,15 @@ This isn't so much an OS, as much as it's a rebranding of Ubuntu, and a packagin
 
 This repo implements that as a Kairos "custom build" option, merging an Ubuntu 22-lts image with Kairos framework, and a fork of github.com/kairos-io/provider-microk8s.
 
+## What's next
 
+- Registration & Backhaul Option 1
+  - Bootstrap AWS Greengrass in microk8s
+  - Authenticate using yubiHSM
+- Registration & Backhaul Option 2
+  - Use flux2 repo https://github.com/cmbaron/blade-config
+  - Authenticate with yubikey using PKCS#11
+  - setup openvpn for backhaul, authenticated with PKCS#11
 
 ## Configuration
 
