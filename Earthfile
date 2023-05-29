@@ -81,9 +81,11 @@ base-image:
         systemctl enable cos-setup-boot.service && \
         systemctl enable cos-setup-network.service
 
+    RUN find /usr/lib/firmware -type f -execdir zstd --rm -9 {} \+
+    RUN find /usr/lib/modules -type f -name "*.ko" -execdir zstd --rm -9 {} \+
 
-    RUN --no-cache kernel=$(ls /lib/modules | head -n1) && dracut -f "/boot/initrd-${kernel}" "${kernel}" && ln -sf "initrd-${kernel}" /boot/initrd
     RUN --no-cache kernel=$(ls /lib/modules | head -n1) && depmod -a "${kernel}"
+    RUN --no-cache kernel=$(ls /lib/modules | head -n1) && dracut -f "/boot/initrd-${kernel}" "${kernel}" && ln -sf "initrd-${kernel}" /boot/initrd
     
     RUN kernel=$(ls /boot/vmlinuz-* | head -n1) && if [ -e "$kernel" ]; then ln -sf "${kernel#/boot/}" /boot/vmlinuz; fi
     RUN kernel=$(ls /boot/Image-* | head -n1) && if [ -e "$kernel" ]; then ln -sf "${kernel#/boot/}" /boot/vmlinuz; fi

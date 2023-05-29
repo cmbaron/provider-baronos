@@ -1,6 +1,8 @@
 ARG BASE_IMAGE=ubuntu:22.04
 
 FROM $BASE_IMAGE
+ARG KARIOS_VERSION=v2.1.0
+ARG KAIROS_FRAMEWORK_VERSION=${KARIOS_VERSION}_ubuntu-22-lts
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -84,15 +86,16 @@ RUN  sed -i -e 's/http:\/\/archive\.ubuntu\.com\/ubuntu\//http:\/\/mirror\.math\
     nvidia-utils-525-server \
     gpg \
     scdaemon \
+    zstd \
     linux-modules-nvidia-525-server-generic \
- && for DIR in firmware; do \
-        mkdir /usr/lib/$DIR.keep; \
-        rsync -rat --ignore-missing-args --include-from=/tmp/$DIR.keep --exclude='*' /usr/lib/$DIR/ /usr/lib/$DIR.keep; \
-        rm -rf /usr/lib/$DIR && mv /usr/lib/$DIR.keep /usr/lib/$DIR; \
-    done \
+#  && for DIR in firmware; do \
+#         mkdir /usr/lib/$DIR.keep; \
+#         rsync -rat --ignore-missing-args --include-from=/tmp/$DIR.keep --exclude='*' /usr/lib/$DIR/ /usr/lib/$DIR.keep; \
+#         rm -rf /usr/lib/$DIR && mv /usr/lib/$DIR.keep /usr/lib/$DIR; \
+#     done \
  && apt-get clean && rm -rf /var/lib/apt/lists/* && rm -rf /var/cache/*
 
-COPY --from=quay.io/kairos/framework:v2.0.0_ubuntu-22-lts / /
+COPY --from=quay.io/kairos/framework:v2.1.0_ubuntu-22-lts / /
 
 RUN ln -s /usr/sbin/grub-install /usr/sbin/grub2-install \
   && ln -s /usr/bin/grub-editenv /usr/bin/grub2-editenv \ 
